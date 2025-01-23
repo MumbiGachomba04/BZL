@@ -4,7 +4,6 @@
 #include <numeric>
 
 void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<double> &alpha, const std::vector<double> &beta, int nIters) {
-    // Construct the tridiagonal matrix
     std::vector<double> T(nIters * nIters, 0.0);
     for (int i = 0; i < nIters; i++) {
         T[i * nIters + i] = alpha[i]; 
@@ -54,11 +53,10 @@ void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<d
 }
 
 void lanczos() {
-    int maxiter = 500;
-    int j = -1; // Start with -1 so that the first increment brings it to 0
-    double convCrit = 1e-6;
+    int maxiter = 80;
+    double convCrit = 1e-10;
     int nIters = 0;
-    uint64_t nstates = 1 << 8; // Number of states (typically a power of 2)
+    uint64_t nstates = 1 << 10; // Number of states (typically a power of 2)
     std::vector<double> alpha(maxiter, 0.0);
     std::vector<double> beta(maxiter, 0.0);
     std::vector<double> gsv(maxiter, 0.0);
@@ -75,68 +73,62 @@ void lanczos() {
         }
     }
 
+     // Initialize q with the first residual vector
+    for (uint64_t i = 0; i < nstates; i++) {
+        q[i] = r[i];
+    }
+
     // Lanczos iteration
     for (int n = 0; n < maxiter - 1; n++) {
-        // Increment j at the start of each iteration
-        j++;
+  
 
-        // Orthogonalize q and r
-        if (j != 0) {
-            for (uint64_t i = 0; i < nstates; i++) {
-                double t = r[i];
-                r[i] = q[i] / beta[j - 1];
-                q[i] = -beta[j - 1] * t;
-            }
-        }
-
-        // Matrix-vector multiplication
-        std::fill(q.begin(), q.end(), 0.0);
+        std::vector<double> temp(nstates, 0.0);
         for (uint64_t i = 0; i < nstates; i++) {
             for (uint64_t k = 0; k < nstates; k++) {
-                q[i] += matrix[i * nstates + k] * r[k];
+                temp[i] += matrix[i * nstates + k] * q[k];
             }
         }
 
         // Update alpha
         double tempalpha = 0.0;
         for (uint64_t i = 0; i < nstates; i++) {
-            tempalpha += r[i] * q[i];
+            tempalpha += temp[i] * q[i];
         }
-        alpha[j] = tempalpha;
+        alpha[n] = tempalpha;
 
-        // Adjust q
+   
         for (uint64_t i = 0; i < nstates; i++) {
-            q[i] -= alpha[j] * r[i];
+            r[i] = temp[i] - alpha[n] * q[i];
+            if (n > 0) {
+                r[i] -= beta[n - 1] * r[i]; // Orthogonalize against previous r
+            }
         }
+
 
         // Update beta
         double tempbeta = 0.0;
         for (uint64_t i = 0; i < nstates; i++) {
-            tempbeta += q[i] * q[i];
+            tempbeta += r[i] * r[i];
         }
-        beta[j] = std::sqrt(tempbeta);
+        beta[n] = std::sqrt(tempbeta);
+
+        // Normalize r
+        for (uint64_t i = 0; i < nstates; i++) {
+            r[i] /= beta[n];
+        }
+
+        // Swap q and r for next iteration
+        std::swap(q, r);
 
         // Solve the tridiagonal matrix for eigenvalues and eigenvectors
-        nIters = j + 1; // Adjust for the 0-based indexing
+        nIters = n + 1; // Adjust for the 0-based indexing
         solveTridiagonal(gse, gsv, alpha, beta, nIters);
 
-        std::cout << "Eigenvalue after iteration " << n + 1 << ": " << gse << std::endl;
-
-        // Compute the residual
-        std::vector<double> residual(nstates, 0.0);
-        for (uint64_t i = 0; i < nstates; i++) {
-            for (uint64_t k = 0; k < nstates; k++) {
-                residual[i] += matrix[i * nstates + k] * gsv[k];
-            }
-            residual[i] -= gse * gsv[i]; // Subtract eigenvalue * eigenvector
-        }
-
-        double residual_norm = std::sqrt(std::inner_product(residual.begin(), residual.end(), residual.begin(), 0.0));
-        std::cout << "Residual norm after iteration " << n + 1 << ": " << residual_norm << std::endl;
+        std::cout << "Eigenvalue after iteration " << nIters << ": " << gse << std::endl;
 
         // Convergence check
-        if (n > 5 && std::fabs(gse - dold) < convCrit && residual_norm < convCrit) {
-            std::cout << "Converged after " << n + 1 << " iterations!" << std::endl;
+        if (n > 5 && std::fabs(gse - dold) < convCrit ) {
+            std::cout << "Converged after " << nIters<< " iterations!" << std::endl;
             break;
         }
         dold = gse;
