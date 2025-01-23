@@ -5,12 +5,13 @@
 
 void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<double> &alpha, const std::vector<double> &beta, int nIters) {
     std::vector<double> T(nIters * nIters, 0.0);
-    for (int i = 0; i < nIters; i++) {
-        T[i * nIters + i] = alpha[i]; 
-        if (i > 0) {
+
+    T[0]=alpha[0];
+    for (int i = 1; i < nIters; i++) {
+            T[i * nIters + i] = alpha[i];     
             T[i * nIters + (i - 1)] = beta[i - 1]; // Subdiagonal
             T[(i - 1) * nIters + i] = beta[i - 1]; // Superdiagonal
-        }
+        
     }
 
     // Power iteration to estimate the eigenvalue and eigenvector
@@ -52,11 +53,11 @@ void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<d
     gsv = eigenvec; // The corresponding eigenvector
 }
 
-void lanczos() {
-    int maxiter = 80;
+void lanczos(int maxiter,int size_basetwo) {
+    
     double convCrit = 1e-10;
     int nIters = 0;
-    uint64_t nstates = 1 << 10; // Number of states (typically a power of 2)
+    uint64_t nstates = 1 << size_basetwo; // Number of states (typically a power of 2)
     std::vector<double> alpha(maxiter, 0.0);
     std::vector<double> beta(maxiter, 0.0);
     std::vector<double> gsv(maxiter, 0.0);
@@ -136,7 +137,17 @@ void lanczos() {
 }
 
 
-int main() {
-    lanczos();
+int main(int argc, char *argv[]) {
+    int maxiter, size_basetwo;
+    if (argc != 3) {
+      std::cout<< "Error: parsing command line arguments"<< std::endl;
+      std::cout<< "./executable <MaximumIterations> <Matrix Size (base2)>"<< std::endl;
+      exit(EXIT_FAILURE);
+   }
+    
+    maxiter = atoi(argv[1]);
+    size_basetwo = atoi(argv[2]);
+
+    lanczos(maxiter,size_basetwo);
     return 0;
 }
