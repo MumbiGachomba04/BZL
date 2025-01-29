@@ -2,20 +2,19 @@
 #include <cmath>
 #include <vector>
 #include <numeric>
-#include <chrono>
+#include <limits>
+#include <omp.h>
 
 void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<double> &alpha, const std::vector<double> &beta, int nIters) {
     std::vector<double> T(nIters * nIters, 0.0);
-   
+
     T[0]=alpha[0];
     for (int i = 1; i < nIters; i++) {
-            T[i * nIters + i] = alpha[i];  
-    // if (i>0)   {
+            T[i * nIters + i] = alpha[i];     
             T[i * nIters + (i - 1)] = beta[i - 1]; // Subdiagonal
             T[(i - 1) * nIters + i] = beta[i - 1]; // Superdiagonal
-    // }
+        
     }
-   
 
     // Power iteration to estimate the eigenvalue and eigenvector
     std::vector<double> eigenvec(nIters, 1.0); // Random initial vector
@@ -25,7 +24,7 @@ void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<d
     for (int iter = 0; iter < 1000; iter++) {
         // T * eigenvec
         std::vector<double> temp(nIters, 0.0);
-        for (int i = 0; i < nIters; ++i) {
+        for (int i = 0; i < nIters; i++) {
             for (int j = 0; j < nIters; ++j) {
                 temp[i] += T[i * nIters + j] * eigenvec[j];
             }
@@ -35,7 +34,7 @@ void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<d
         double norm = std::sqrt(std::accumulate(temp.begin(), temp.end(), 0.0, [](double sum, double val) {
             return sum + val * val;
         }));
-        
+ #pragma omp parallel for       
         for (int i = 0; i < nIters; ++i) {
             temp[i] /= norm;
         }
@@ -71,6 +70,7 @@ void lanczos(int maxiter,int size_basetwo) {
     double gse;
 
     // Fill matrix
+#pragma omp parallel for
     for (uint64_t i = 0; i < nstates; i++) {
         for (uint64_t k = 0; k < nstates; k++) {
             matrix[i * nstates + k] += std::sin((double)i + (double)k); 
@@ -78,16 +78,18 @@ void lanczos(int maxiter,int size_basetwo) {
     }
 
      // Initialize q with the first residual vector
+#pragma omp parallel for   
     for (uint64_t i = 0; i < nstates; i++) {
         q[i] = r[i];
     }
-    double time=0.0;
 
     // Lanczos iteration
     for (int n = 0; n < maxiter - 1; n++) {
   
+    //matrix-vector multiplication
 
         std::vector<double> temp(nstates, 0.0);
+#pragma omp parallel for 
         for (uint64_t i = 0; i < nstates; i++) {
             for (uint64_t k = 0; k < nstates; k++) {
                 temp[i] += matrix[i * nstates + k] * q[k];
@@ -96,12 +98,13 @@ void lanczos(int maxiter,int size_basetwo) {
 
         // Update alpha
         double tempalpha = 0.0;
+#pragma omp parallel for reduction(+ : tempalpha)       
         for (uint64_t i = 0; i < nstates; i++) {
             tempalpha += temp[i] * q[i];
         }
         alpha[n] = tempalpha;
 
-   
+#pragma omp parallel for
         for (uint64_t i = 0; i < nstates; i++) {
             r[i] = temp[i] - alpha[n] * q[i];
             if (n > 0) {
@@ -112,12 +115,14 @@ void lanczos(int maxiter,int size_basetwo) {
 
         // Update beta
         double tempbeta = 0.0;
+#pragma omp parallel for reduction(+ : tempbeta)  
         for (uint64_t i = 0; i < nstates; i++) {
             tempbeta += r[i] * r[i];
         }
         beta[n] = std::sqrt(tempbeta);
 
         // Normalize r
+#pragma omp parallel for
         for (uint64_t i = 0; i < nstates; i++) {
             r[i] /= beta[n];
         }
@@ -127,13 +132,7 @@ void lanczos(int maxiter,int size_basetwo) {
 
         // Solve the tridiagonal matrix for eigenvalues and eigenvectors
         nIters = n + 1; // Adjust for the 0-based indexing
-        auto start = std::chrono::high_resolution_clock::now();
         solveTridiagonal(gse, gsv, alpha, beta, nIters);
-         auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        time+= elapsed.count();
-
-   
 
         std::cout << "Eigenvalue after iteration " << nIters << ": " << gse << std::endl;
 
@@ -144,7 +143,6 @@ void lanczos(int maxiter,int size_basetwo) {
         }
         dold = gse;
     }
-     std::cout << "Elapsed time: " << time << " seconds" << std::endl;
 }
 
 
