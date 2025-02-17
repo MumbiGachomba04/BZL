@@ -8,6 +8,14 @@
 #include <omp.h>
 #endif
 
+#define PI 3.14159265358979323846
+
+inline double fast_sin(double x) {
+    const double B = 4.0 / PI;
+    const double C = -4.0 / (PI * PI);
+    return B * x + C * x * std::abs(x);
+}
+
 void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<double> &alpha, const std::vector<double> &beta, int nIters) {
     std::vector<double> T(nIters * nIters, 0.0);
     T[0]=alpha[0];
@@ -101,7 +109,7 @@ void lanczos(int maxiter,int size_basetwo) {
 #pragma omp simd 
 #endif
         for (uint64_t k = 0; k < nstates; k++) {
-            matrix[i * nstates + k] += std::sin((double)i + (double)k); 
+            matrix[i * nstates + k] += fast_sin((double)i + (double)k); 
         }
     }
 
