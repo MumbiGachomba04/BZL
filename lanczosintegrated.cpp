@@ -8,7 +8,12 @@
 #include <omp.h>
 #endif
 
+#ifdef _RAVETRACE
+#include "sdv_tracing.h"
+#endif
+
 #define PI 3.14159265358979323846
+
 
 inline double fast_sin(double x) {
     const double B = 4.0 / PI;
@@ -94,6 +99,13 @@ void lanczos(int maxiter,int size_basetwo) {
     double gse;
     int threads=1;
 
+#ifdef _RAVETRACE
+    int values[] = {0,1,2,3,4,5,6,7,8};
+    const char * v_names[] = {"Other","fill_matrix","init_q","mat_vec","update_alpha","orthoganalise","update_beta","normalise","tridiagonal"};
+    trace_name_event_and_values(1000, "code_region", 9, values, v_names);
+    trace_init();
+#endif
+
     // Fill matrix
 #ifdef _OPENMPWORKSHARING
 #pragma omp parallel 
@@ -103,7 +115,10 @@ void lanczos(int maxiter,int size_basetwo) {
     
 }
 #pragma omp parallel for
-#endif  
+#endif
+#ifdef _RAVETRACE
+trace_event_and_value(1000,1);
+#endif
     for (uint64_t i = 0; i < nstates; i++) {
 #ifdef _OPENMPSIMD
 #pragma omp simd 
@@ -112,7 +127,9 @@ void lanczos(int maxiter,int size_basetwo) {
             matrix[i * nstates + k] += fast_sin((double)i + (double)k); 
         }
     }
-
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
      // Initialize q with the first residual vector
 #ifdef _OPENMPWORKSHARING
 #pragma omp parallel for 
@@ -120,9 +137,15 @@ void lanczos(int maxiter,int size_basetwo) {
 #ifdef _OPENMPSIMD
 #pragma omp simd 
 #endif
+#ifdef _RAVETRACE
+trace_event_and_value(1000,2);
+#endif
     for (uint64_t i = 0; i < nstates; i++) {
         q[i] = r[i];
     }
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
     double time=0.0;
 auto start = std::chrono::high_resolution_clock::now();
     // Lanczos iteration
@@ -138,6 +161,9 @@ auto start = std::chrono::high_resolution_clock::now();
 #ifdef _OPENMPSIMD
 #pragma omp simd reduction(+:cumulate)
 #endif        
+#ifdef _RAVETRACE
+trace_event_and_value(1000,3);
+#endif
         for (uint64_t i = 0; i < nstates; i++) {
             cumulate =0.0;
             for (uint64_t k = 0; k < nstates; k++) {
@@ -145,6 +171,9 @@ auto start = std::chrono::high_resolution_clock::now();
             }
             temp[i]=cumulate;
         }
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
 
         // Update alpha
         double tempalpha = 0.0;
@@ -154,24 +183,34 @@ auto start = std::chrono::high_resolution_clock::now();
 #ifdef _OPENMPSIMD
 #pragma omp simd reduction(+:tempalpha)
 #endif  
+#ifdef _RAVETRACE
+trace_event_and_value(1000,4);
+#endif
         for (uint64_t i = 0; i < nstates; i++) {
             tempalpha += temp[i] * q[i];
         }
         alpha[n] = tempalpha;
-
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
 #ifdef _OPENMPWORKSHARING
 #pragma omp parallel for 
 #endif 
 #ifdef _OPENMPSIMD
 #pragma omp simd 
 #endif 
+#ifdef _RAVETRACE
+trace_event_and_value(1000,5);
+#endif	
         for (uint64_t i = 0; i < nstates; i++) {
             r[i] = temp[i] - alpha[n] * q[i];
             if (n > 0) {
                 r[i] -= beta[n - 1] * r[i]; // Orthogonalize against previous r
             }
         }
-
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
 
         // Update beta
         double tempbeta = 0.0;
@@ -181,11 +220,16 @@ auto start = std::chrono::high_resolution_clock::now();
 #ifdef _OPENMPSIMD
 #pragma omp simd reduction(+ : tempbeta) 
 #endif 
+#ifdef _RAVETRACE
+trace_event_and_value(1000,6);
+#endif
         for (uint64_t i = 0; i < nstates; i++) {
             tempbeta += r[i] * r[i];
         }
         beta[n] = std::sqrt(tempbeta);
-
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
         // Normalize r
 #ifdef _OPENMPWORKSHARING
 #pragma omp parallel for 
@@ -193,17 +237,28 @@ auto start = std::chrono::high_resolution_clock::now();
 #ifdef _OPENMPSIMD
 #pragma omp simd 
 #endif
+#ifdef _RAVETRACE
+trace_event_and_value(1000,7);
+#endif	
         for (uint64_t i = 0; i < nstates; i++) {
             r[i] /= beta[n];
         }
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
 
         // Swap q and r for next iteration
         std::swap(q, r);
 
         // Solve the tridiagonal matrix for eigenvalues and eigenvectors
         nIters = n + 1; // Adjust for the 0-based indexing
-        
+#ifdef _RAVETRACE
+trace_event_and_value(1000,8);
+#endif        
         solveTridiagonal(gse, gsv, alpha, beta, nIters);
+#ifdef _RAVETRACE
+trace_event_and_value(1000,0);
+#endif
         std::cout << "Eigenvalue after iteration " << nIters << ": " << gse << std::endl;
 
         // Convergence check
