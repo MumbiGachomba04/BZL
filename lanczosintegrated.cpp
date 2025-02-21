@@ -59,12 +59,16 @@ void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<d
         double norm = std::sqrt(std::accumulate(temp.begin(), temp.end(), 0.0, [](double sum, double val) {
             return sum + val * val;
         }));
-#ifdef _OPENMPWORKSHARING
-#pragma omp parallel for  
-#endif      
-#ifdef _OPENMPSIMD
-#pragma omp simd 
-#endif 
+
+#ifdef _OPENMPBOTH
+    #pragma omp parallel for simd
+#elif defined(_OPENMPWORKSHARING)
+    #pragma omp parallel for
+#elif defined(_OPENMPSIMD)
+    #pragma omp simd
+#else
+
+#endif
         for (int i = 0; i < nIters; ++i) {
             temp[i] /= norm;
         }
@@ -116,9 +120,9 @@ void lanczos(int maxiter,int size_basetwo) {
     
 }
 #pragma omp parallel for
-#endif
-#ifdef _RAVETRACE
+#elif defined (_RAVETRACE)
 trace_event_and_value(1000,1);
+#else
 #endif
     for (uint64_t i = 0; i < nstates; i++) {
 #ifdef _OPENMPSIMD
@@ -131,19 +135,23 @@ trace_event_and_value(1000,1);
 #ifdef _RAVETRACE
 trace_event_and_value(1000,0);
 #endif
+
      // Initialize q with the first residual vector
-#ifdef _OPENMPWORKSHARING
-#pragma omp parallel for 
-#endif 
-#ifdef _OPENMPSIMD
-#pragma omp simd 
+#ifdef _OPENMPBOTH
+    #pragma omp parallel for simd
+#elif defined(_OPENMPWORKSHARING)
+    #pragma omp parallel for
+#elif defined(_OPENMPSIMD)
+    #pragma omp simd
+#elif defined (_RAVETRACE)
+trace_event_and_value(1000,2);    
+#else
 #endif
-#ifdef _RAVETRACE
-trace_event_and_value(1000,2);
-#endif
+
     for (uint64_t i = 0; i < nstates; i++) {
         q[i] = r[i];
     }
+
 #ifdef _RAVETRACE
 trace_event_and_value(1000,0);
 #endif
@@ -156,11 +164,13 @@ auto start = std::chrono::high_resolution_clock::now();
     // Matvec multiplication
         std::vector<double> temp(nstates, 0.0);
         double cumulate ;
+
+
 #ifdef _OPENMPWORKSHARING
-#pragma omp parallel for schedule(runtime) reduction(+:cumulate)
-#endif      
-#ifdef _RAVETRACE
+#pragma omp parallel for reduction(+:cumulate)    
+#elif defined (_RAVETRACE)
 trace_event_and_value(1000,3);
+#else
 #endif
         for (uint64_t i = 0; i < nstates; i++) {
             cumulate =0.0;
@@ -178,14 +188,15 @@ trace_event_and_value(1000,0);
 
         // Update alpha
         double tempalpha = 0.0;
-#ifdef _OPENMPWORKSHARING
+#ifdef _OPENMPBOTH
+#pragma omp parallel for simd reduction(+ : tempalpha)         
+#elif defined (_OPENMPWORKSHARING)
 #pragma omp parallel for reduction(+ : tempalpha) 
-#endif 
-#ifdef _OPENMPSIMD
-#pragma omp simd reduction(+:tempalpha)
-#endif  
-#ifdef _RAVETRACE
+#elif defined (_OPENMPSIMD)
+#pragma omp simd reduction(+:tempalpha) 
+#elif defined (_RAVETRACE)
 trace_event_and_value(1000,4);
+#else
 #endif
         for (uint64_t i = 0; i < nstates; i++) {
             tempalpha += temp[i] * q[i];
@@ -194,14 +205,16 @@ trace_event_and_value(1000,4);
 #ifdef _RAVETRACE
 trace_event_and_value(1000,0);
 #endif
-#ifdef _OPENMPWORKSHARING
-#pragma omp parallel for 
-#endif 
-#ifdef _OPENMPSIMD
+
+#ifdef _OPENMPBOTH
+#pragma omp parallel for simd
+#elif defined (_OPENMPWORKSHARING)
+#pragma omp parallel for  
+#elif defined (_OPENMPSIMD)
 #pragma omp simd 
-#endif 
-#ifdef _RAVETRACE
+#elif defined (_RAVETRACE)
 trace_event_and_value(1000,5);
+#else
 #endif	
         for (uint64_t i = 0; i < nstates; i++) {
             r[i] = temp[i] - alpha[n] * q[i];
@@ -215,14 +228,15 @@ trace_event_and_value(1000,0);
 
         // Update beta
         double tempbeta = 0.0;
-#ifdef _OPENMPWORKSHARING
-#pragma omp parallel for reduction(+ : tempbeta)
-#endif  
-#ifdef _OPENMPSIMD
-#pragma omp simd reduction(+ : tempbeta) 
-#endif 
-#ifdef _RAVETRACE
+#ifdef _OPENMPBOTH
+#pragma omp parallel for simd reduction(+ : tempbeta)         
+#elif defined (_OPENMPWORKSHARING)
+#pragma omp parallel for reduction(+ : tempbeta) 
+#elif defined (_OPENMPSIMD)
+#pragma omp simd reduction(+:tempbeta) 
+#elif defined (_RAVETRACE)
 trace_event_and_value(1000,6);
+#else
 #endif
         for (uint64_t i = 0; i < nstates; i++) {
             tempbeta += r[i] * r[i];
@@ -232,15 +246,16 @@ trace_event_and_value(1000,6);
 trace_event_and_value(1000,0);
 #endif
         // Normalize r
-#ifdef _OPENMPWORKSHARING
-#pragma omp parallel for 
-#endif 
-#ifdef _OPENMPSIMD
+#ifdef _OPENMPBOTH
+#pragma omp parallel for simd
+#elif defined (_OPENMPWORKSHARING)
+#pragma omp parallel for  
+#elif defined (_OPENMPSIMD)
 #pragma omp simd 
-#endif
-#ifdef _RAVETRACE
+#elif defined (_RAVETRACE)
 trace_event_and_value(1000,7);
-#endif	
+#else
+#endif		
         for (uint64_t i = 0; i < nstates; i++) {
             r[i] /= beta[n];
         }
