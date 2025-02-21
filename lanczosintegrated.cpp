@@ -43,11 +43,12 @@ void solveTridiagonal(double &gse, std::vector<double> &gsv, const std::vector<d
 #ifdef _OPENMPWORKSHARING
 #pragma omp parallel for reduction(+:cumulate)
 #endif
-#ifdef _OPENMPSIMD
-#pragma omp simd reduction(+:cumulate)
-#endif  
+ 
         for (int i = 0; i < nIters; ++i) {
             cumulate=0.0;
+#ifdef _OPENMPSIMD
+#pragma omp simd reduction(+:cumulate)
+#endif 
             for (int j = 0; j < nIters; ++j) {
                 cumulate += T[i * nIters + j] * eigenvec[j];
             }
@@ -157,15 +158,15 @@ auto start = std::chrono::high_resolution_clock::now();
         double cumulate ;
 #ifdef _OPENMPWORKSHARING
 #pragma omp parallel for schedule(runtime) reduction(+:cumulate)
-#endif 
-#ifdef _OPENMPSIMD
-#pragma omp simd reduction(+:cumulate)
-#endif        
+#endif      
 #ifdef _RAVETRACE
 trace_event_and_value(1000,3);
 #endif
         for (uint64_t i = 0; i < nstates; i++) {
             cumulate =0.0;
+#ifdef _OPENMPSIMD
+#pragma omp simd reduction(+:cumulate)
+#endif   
             for (uint64_t k = 0; k < nstates; k++) {
                 cumulate += matrix[i * nstates + k] * q[k];
             }
