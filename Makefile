@@ -6,8 +6,8 @@ OMPFLAGS=-fopenmp
 VECANALYSIS=-Rpass-analysis=loop-vectorize -Rpass=loop-vectorize
 VFLAGS =-ffast-math -fno-builtin-sin -mepi
 
-codes10 = lanczosomp lanczosserial lanczossimd lanczosonepointo.x
-codes07 = lanczosomp lanczosserial lanczossimd lanczosvectorised.x
+codes10 = lanczosomp lanczosserial lanczossimd lanczosonepointo.x lanczosbothomp
+codes07 = lanczosomp lanczosserial lanczossimd lanczosvectorised.x lanczosbothomp
 
 all10: $(codes10)
 all07: $(codes07)
