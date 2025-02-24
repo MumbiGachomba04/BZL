@@ -112,13 +112,14 @@ void lanczos(int maxiter,int size_basetwo) {
 #endif
 
     // Fill matrix
-#ifdef _OPENMPWORKSHARING
+#ifdef __OMP
 #pragma omp parallel 
 {
     #pragma omp single
     threads = omp_get_num_threads();
     
 }
+#elif defined (_OPENMPWORKSHARING)
 #pragma omp parallel for
 #elif defined (_RAVETRACE)
 trace_event_and_value(1000,1);
