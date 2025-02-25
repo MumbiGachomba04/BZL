@@ -1,3 +1,13 @@
+/*                                  
+ * Regina Mumbi Gachomba
+ * regina.gachomba1@bsc.es
+ * Barcelona Supercomputing Center
+ *
+ * Simple Lanczos method
+ * An iterative algorithm for computing the extremal eigenvalues 
+ * and corresponding eigenvectors of a large, sparse, symmetric matrix (Hermitian matrix)
+ */
+
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -298,7 +308,7 @@ int main(int argc, char *argv[]) {
     int maxiter, size_basetwo;
     if (argc != 3) {
       std::cout<< "Error: parsing command line arguments"<< std::endl;
-      std::cout<< "./executable <MaximumIterations> <Matrix Size (base2)>"<< std::endl;
+      std::cout<< "./binary <MaximumIterations> <Matrix Size (base2)>"<< std::endl;
       exit(EXIT_FAILURE);
    }
     
